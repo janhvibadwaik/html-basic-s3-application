@@ -3,7 +3,7 @@ name: Deploy To S3
 on:
   push:
     branches:
-      - "*" # Runs on push to any branch
+      - "*" # Deploy on any branch push
 
 jobs:
   build-and-deploy:
@@ -31,22 +31,21 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: 'ap-south-1'
 
-      - name: Deploy to S3
+      - name: Upload static files to S3
         run: |
-          # Path to the build output folder (adjust if needed)
           BUILD_DIR=build
 
-          # Sync non-JS/CSS files first
-          aws s3 sync $BUILD_DIR s3://html-basic-s3-aplication --delete \
-            --exclude "*.js" --exclude "*.css" \
-            --exclude ".git/*" --exclude ".github/*"
+          # Sync everything (default MIME types may not be perfect)
+          aws s3 sync $BUILD_DIR s3://html-basic-s3-aplication --delete
 
-          # Sync JS files with correct content type
-          find $BUILD_DIR -name "*.js" -exec \
-            aws s3 cp {} s3://html-basic-s3-aplication/{} \
-            --content-type "application/javascript" \;
+          # Re-sync .js files with correct content-type
+          find $BUILD_DIR -name "*.js" | while read filepath; do
+            aws s3 cp "$filepath" "s3://html-basic-s3-aplication/${filepath#$BUILD_DIR/}" \
+              --content-type "application/javascript"
+          done
 
-          # Sync CSS files with correct content type
-          find $BUILD_DIR -name "*.css" -exec \
-            aws s3 cp {} s3://html-basic-s3-aplication/{} \
-            --content-type "text/css" \;
+          # Re-sync .css files with correct content-type
+          find $BUILD_DIR -name "*.css" | while read filepath; do
+            aws s3 cp "$filepath" "s3://html-basic-s3-aplication/${filepath#$BUILD_DIR/}" \
+              --content-type "text/css"
+          done
