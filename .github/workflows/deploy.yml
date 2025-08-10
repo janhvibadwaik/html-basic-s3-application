@@ -1,43 +1,24 @@
 name: Deploy To S3
 
 on:
-    push:
-        branches: 
-            - "*"
+  push:
+    branches:
+      - main
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v2
-        
-            - name: Setup Node.js
-              uses: actions/setup-node@v2
-              with:
-                node-version: '20'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-            - name: Install Dependencies
-              run: npm install
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
 
-            - name: Build Project
-              run: npm run build
-
-            - name: AWS Credentials Configure
-              uses: aws-actions/configure-aws-credentials@v1
-              with:
-                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                aws-region: 'ap-south-1'
-
-            - name: Push to S3
-              run: |
-                # First sync non-JS/CSS files
-                aws s3 sync ./dist s3://html-basic-s3-aplication --delete --exclude "*.js" --exclude "*.css"
-                
-                # Then sync JS files with correct content type
-                aws s3 sync ./dist s3://html-basic-s3-aplication --include "*.js" --content-type "application/javascript"
-                
-                # Then sync CSS files with correct content type
-                aws s3 sync ./dist s3://html-basic-s3-aplication --include "*.css" --content-type "text/css"
+      - name: Sync to S3
+        run: aws s3 sync . s3://html-basic-s3-aplication --delete
