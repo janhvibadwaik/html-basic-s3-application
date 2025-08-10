@@ -1,51 +1,43 @@
 name: Deploy To S3
 
 on:
-  push:
-    branches:
-      - "*" # Deploy on any branch push
+    push:
+        branches: 
+            - "*"
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+    build:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+        
+            - name: Setup Node.js
+              uses: actions/setup-node@v2
+              with:
+                node-version: '20'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '20'
+            - name: Install Dependencies
+              run: npm install
 
-      - name: Install dependencies
-        run: npm install
+            - name: Build Project
+              run: npm run build
 
-      - name: Build project
-        run: npm run build
+            - name: AWS Credentials Configure
+              uses: aws-actions/configure-aws-credentials@v1
+              with:
+                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                aws-region: 'ap-south-1'
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: 'ap-south-1'
-
-      - name: Upload static files to S3
-        run: |
-          BUILD_DIR=build
-
-          # Sync everything (default MIME types may not be perfect)
-          aws s3 sync $BUILD_DIR s3://html-basic-s3-aplication --delete
-
-          # Re-sync .js files with correct content-type
-          find $BUILD_DIR -name "*.js" | while read filepath; do
-            aws s3 cp "$filepath" "s3://html-basic-s3-aplication/${filepath#$BUILD_DIR/}" \
-              --content-type "application/javascript"
-          done
-
-          # Re-sync .css files with correct content-type
-          find $BUILD_DIR -name "*.css" | while read filepath; do
-            aws s3 cp "$filepath" "s3://html-basic-s3-aplication/${filepath#$BUILD_DIR/}" \
-              --content-type "text/css"
-          done
+            - name: Push to S3
+              run: |
+                # First sync non-JS/CSS files
+                aws s3 sync ./dist s3://html-basic-s3-aplication --delete --exclude "*.js" --exclude "*.css"
+                
+                # Then sync JS files with correct content type
+                aws s3 sync ./dist s3://html-basic-s3-aplication --include "*.js" --content-type "application/javascript"
+                
+                # Then sync CSS files with correct content type
+                aws s3 sync ./dist s3://html-basic-s3-aplication --include "*.css" --content-type "text/css"
